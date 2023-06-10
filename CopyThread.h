@@ -45,7 +45,7 @@ protected:
     void run() override;
 
     // 写文件
-    void write();
+    void write(const std::string& fileSuffix = ".csv");
 
 private:
 
