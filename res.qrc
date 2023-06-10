@@ -1,0 +1,19 @@
+<RCC>
+    <qresource prefix="/new/prefix1">
+        <file>images/alpha.svg</file>
+        <file>images/clear.svg</file>
+        <file>images/folder.svg</file>
+        <file>images/logo.svg</file>
+        <file>images/query.svg</file>
+        <file>images/start.svg</file>
+        <file>images/stop.svg</file>
+        <file>images/tag.svg</file>
+        <file>images/topHint_active.svg</file>
+        <file>images/topHint_normal.svg</file>
+        <file>images/zoomin.svg</file>
+        <file>images/zoomout.svg</file>
+        <file>images/txt.svg</file>
+        <file>images/copy.svg</file>
+        <file>images/cut.svg</file>
+    </qresource>
+</RCC>
