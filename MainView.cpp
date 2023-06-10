@@ -9,6 +9,9 @@
 #include <stdlib.h>
 #include <io.h>
 
+// 是否使用源路径
+//#define USE_SRC_DIR
+
 MainView::MainView(QWidget *parent)
     : QDialog(parent)
     , ui(new Ui::MainView)
@@ -37,15 +40,19 @@ void MainView::init()
         //::SetWindowPos((HWND)(this->winId()), HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
     });
 
-    // 源路径
+// 源路径
+#ifdef USE_SRC_DIR
+    ui->pushButton_srcDirectory->setEnabled(true);
     QObject::connect(ui->pushButton_srcDirectory, &QPushButton::clicked, this, [&]() {
         ui->lineEdit_srcDirectory->setText(QFileDialog::getExistingDirectory(this,
                                                                              QObject::tr("选择原始文件夹"),
                                                                              QDir::tempPath()));
     });
+    ui->lineEdit_srcDirectory->setEnabled(true);
     QObject::connect(ui->lineEdit_srcDirectory, &QLineEdit::textChanged, this, [&](const QString&) {
         toggleCopyAndCutEnabled();
     });
+#endif
 
     // 目标路径
     QObject::connect(ui->pushButton_dstDirectory, &QPushButton::clicked, this, [&]() {
@@ -83,7 +90,10 @@ void MainView::init()
         ui->progressBar->setValue(0);
     });
     QObject::connect(m_copyThread, &CopyThread::sigStop, this, [&]() {
+        ui->progressBar->setMinimum(0);
+        ui->progressBar->setMaximum(100);
         ui->progressBar->setValue(100);
+
         if(!ui->textBrowser_copyFailed->toPlainText().isEmpty())
         {
             ui->tabWidget->setCurrentIndex(1);
@@ -100,11 +110,12 @@ void MainView::init()
 
         setMainViewEnabled(true);
     });
-    QObject::connect(m_copyThread, &CopyThread::sigCopyFailedItem, this, [&](const QString& fileName) {
-        ui->textBrowser_copyFailed->append(fileName);
-    });
     QObject::connect(m_copyThread, &CopyThread::sigProgress, this, [&](int value) {
         ui->progressBar->setValue(value);
+    });
+    QObject::connect(m_copyThread, &CopyThread::sigGenerateCSV, this, [&]() {
+        ui->progressBar->setMinimum(100);
+        ui->progressBar->setMaximum(0);
     });
     QObject::connect(m_copyThread, &CopyThread::sigCopyException, this, [&]() {
         ui->progressBar->setValue(100);
@@ -118,16 +129,20 @@ void MainView::init()
 
 void MainView::toggleCopyAndCutEnabled()
 {
-    const bool enabled = (!ui->lineEdit_srcDirectory->text().isEmpty()
-                          && !ui->lineEdit_dstDirectory->text().isEmpty()
-                          && !ui->lineEdit_targetFile->text().isEmpty());
+    bool enabled = (!ui->lineEdit_dstDirectory->text().isEmpty()
+                    && !ui->lineEdit_targetFile->text().isEmpty());
+#ifdef USE_SRC_DIR
+    enabled = enabled && (!ui->lineEdit_srcDirectory->text().isEmpty());
+#endif
     ui->pushButton_copy->setEnabled(enabled);
     ui->pushButton_cut->setEnabled(enabled);
 }
 
 void MainView::setMainViewEnabled(bool enabled)
 {
+#ifdef USE_SRC_DIR
     ui->pushButton_srcDirectory->setEnabled(enabled);
+#endif
     ui->pushButton_dstDirectory->setEnabled(enabled);
     ui->pushButton_targetFile->setEnabled(enabled);
     ui->pushButton_copy->setEnabled(enabled);
@@ -136,6 +151,7 @@ void MainView::setMainViewEnabled(bool enabled)
 
 void MainView::startProcess(int type)
 {
+#ifdef USE_SRC_DIR
     if(ui->lineEdit_srcDirectory->text() == ui->lineEdit_dstDirectory->text())
     {
         QMessageBox::information(this,
@@ -143,6 +159,7 @@ void MainView::startProcess(int type)
                                  QObject::tr("原始路径不能和目标路径一致！"));
         return;
     }
+#endif
 
     if(ui->lineEdit_targetFile->text().isEmpty())
     {

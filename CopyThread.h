@@ -3,6 +3,9 @@
 
 #include <QObject>
 #include <QThread>
+#include <QVector>
+#include <QPair>
+#include <set>
 
 class CopyThread : public QThread
 {
@@ -27,11 +30,11 @@ signals:
     // 结束
     void sigStop();
 
-    // 拷贝失败的文件
-    void sigCopyFailedItem(const QString& fileName);
-
     // 实时进度
     void sigProgress(int value);
+
+    // 开始写出到本地
+    void sigGenerateCSV();
 
     // 拷贝异常
     void sigCopyException();
@@ -41,10 +44,24 @@ protected:
     // 核心函数
     void run() override;
 
+    // 写文件
+    void write();
+
 private:
 
     // 源文件夹、目标文件夹、文件集合
     std::tuple<QString, QString, QString, int> m_copyInfo;
+
+    enum class ProcessType {
+        PT_Succeed,
+        PT_SrcNotExist,
+        PT_DstAlreadyExist,
+        PT_Exception,
+    };
+
+    // 记录每项的拷贝状态
+    QVector<QPair<QString, ProcessType>> m_processHistory;
+    std::set<ProcessType> m_processTypeSet;
 
 };
 
