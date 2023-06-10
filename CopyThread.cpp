@@ -4,6 +4,7 @@
 #include <QFileInfo>
 #include <QDir>
 #include <QDateTime>
+#include <QCoreApplication>
 #include <fstream>
 
 // 是否使用源路径
@@ -11,6 +12,9 @@
 
 CopyThread::CopyThread(QObject *parent /*= nullptr*/)
     : QThread(parent)
+    , m_processHistory({})
+    , m_processTypeSet({})
+    , m_outputDir("")
 {
 
 }
@@ -37,6 +41,7 @@ void CopyThread::run()
 
     m_processHistory.resize(0);
     m_processTypeSet.clear();
+    m_outputDir.clear();
 
     // 解析要拷贝的文件名
     QFile file(std::get<2>(m_copyInfo));
@@ -143,7 +148,7 @@ void CopyThread::run()
         return;
     }
 
-    emit sigStop();
+    emit sigStop(m_outputDir);
 }
 
 void CopyThread::write(const std::string& fileSuffix /*= ".csv"*/)
@@ -154,45 +159,39 @@ void CopyThread::write(const std::string& fileSuffix /*= ".csv"*/)
     QString suffix = "_" + date.toString("yyyy_MM_dd") + "_" + time.toString("hh_mm_ss");
 
     // 创建文件夹
-    QString targetDir = "./result" + suffix;
+    m_outputDir = QCoreApplication::applicationDirPath() + "/result" + suffix;
     QDir dir;
-    dir.mkpath(targetDir);
+    dir.mkpath(m_outputDir);
+
+    // 定义打印
+    auto out = [&](const std::string& fileName, const ProcessType type)
+    {
+        std::ofstream ofs(m_outputDir.toStdString() + "/" + fileName + fileSuffix);
+        for(const auto& h : m_processHistory)
+        {
+            if(type == h.second)
+            {
+                ofs << h.first.toLocal8Bit().toStdString() << "\n";
+            }
+        }
+        ofs.close();
+    };
 
     // 开始写文件
     if(m_processTypeSet.count(ProcessType::PT_Succeed) > 0)
     {
-        std::ofstream ofs_Succeed(targetDir.toStdString() + "/Succeed" + fileSuffix);
-        for(const auto& h : m_processHistory)
-        {
-            if(ProcessType::PT_Succeed == h.second) ofs_Succeed << h.first.toLocal8Bit().toStdString() << "\n";
-        }
-        ofs_Succeed.close();
+        out("Succeed", ProcessType::PT_Succeed);
     }
     if(m_processTypeSet.count(ProcessType::PT_SrcNotExist) > 0)
     {
-        std::ofstream ofs_SrcNotExist(targetDir.toStdString() + "/SrcNotExist" + fileSuffix);
-        for(const auto& h : m_processHistory)
-        {
-            if(ProcessType::PT_SrcNotExist == h.second) ofs_SrcNotExist << h.first.toStdString() << "\n";
-        }
-        ofs_SrcNotExist.close();
+        out("SrcNotExist", ProcessType::PT_SrcNotExist);
     }
     if(m_processTypeSet.count(ProcessType::PT_DstAlreadyExist) > 0)
     {
-        std::ofstream ofs_DstAlreadyExist(targetDir.toStdString() + "/DstAlreadyExist" = fileSuffix);
-        for(const auto& h : m_processHistory)
-        {
-            if(ProcessType::PT_DstAlreadyExist == h.second) ofs_DstAlreadyExist << h.first.toStdString() << "\n";
-        }
-        ofs_DstAlreadyExist.close();
+        out("DstAlreadyExist", ProcessType::PT_DstAlreadyExist);
     }
     if(m_processTypeSet.count(ProcessType::PT_Exception) > 0)
     {
-        std::ofstream ofs_Exception(targetDir.toStdString() + "/Exception" + fileSuffix);
-        for(const auto& h : m_processHistory)
-        {
-            if(ProcessType::PT_Exception == h.second) ofs_Exception << h.first.toStdString() << "\n";
-        }
-        ofs_Exception.close();
+        out("Exception", ProcessType::PT_Exception);
     }
 }

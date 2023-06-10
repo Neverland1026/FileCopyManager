@@ -3,6 +3,7 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QTimer>
+#include <QDesktopServices>
 #include <QMimeData>
 #include <windows.h>
 #include <stdio.h>
@@ -89,26 +90,25 @@ void MainView::init()
     QObject::connect(m_copyThread, &CopyThread::sigStart, this, [&]() {
         ui->progressBar->setValue(0);
     });
-    QObject::connect(m_copyThread, &CopyThread::sigStop, this, [&]() {
+    QObject::connect(m_copyThread, &CopyThread::sigStop, this, [&](const QString& outputDir) {
         ui->progressBar->setMinimum(0);
         ui->progressBar->setMaximum(100);
         ui->progressBar->setValue(100);
 
-        if(!ui->textBrowser_copyFailed->toPlainText().isEmpty())
+        setMainViewEnabled(true);
+
+        if(ui->checkBox_openResultDir->isChecked())
         {
-            ui->tabWidget->setCurrentIndex(1);
-            QMessageBox::information(this,
-                                     QObject::tr("提示"),
-                                     QObject::tr("以下文件拷贝失败！"));
-        }
-        else
-        {
-            QMessageBox::information(this,
-                                     QObject::tr("提示"),
-                                     QObject::tr("全部完成！"));
+            if(QFileInfo::exists(outputDir))
+            {
+                QDesktopServices::openUrl(QUrl("file:///" + outputDir));
+            }
         }
 
-        setMainViewEnabled(true);
+        QMessageBox::information(this,
+                                 QObject::tr("提示"),
+                                 QObject::tr("全部完成！"));
+
     });
     QObject::connect(m_copyThread, &CopyThread::sigProgress, this, [&](int value) {
         ui->progressBar->setValue(value);

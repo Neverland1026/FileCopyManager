@@ -28,7 +28,7 @@ signals:
     void sigStart();
 
     // 结束
-    void sigStop();
+    void sigStop(const QString& outputDir);
 
     // 实时进度
     void sigProgress(int value);
@@ -52,6 +52,7 @@ private:
     // 源文件夹、目标文件夹、文件集合
     std::tuple<QString, QString, QString, int> m_copyInfo;
 
+    // 拷贝结果枚举
     enum class ProcessType {
         PT_Succeed,
         PT_SrcNotExist,
@@ -62,6 +63,9 @@ private:
     // 记录每项的拷贝状态
     QVector<QPair<QString, ProcessType>> m_processHistory;
     std::set<ProcessType> m_processTypeSet;
+
+    // 成果输出文件夹
+    QString m_outputDir;
 
 };
 
