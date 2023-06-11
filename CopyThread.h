@@ -6,6 +6,7 @@
 #include <QVector>
 #include <QPair>
 #include <set>
+#include <QSet>
 
 class CopyThread : public QThread
 {
@@ -81,6 +82,9 @@ private:
     // 记录每项的拷贝状态
     QVector<QPair<QString, OperateResultType>> m_processHistory;
     std::map<OperateResultType, int> m_processCount;
+
+    // 跳过的文件
+    QSet<QString> m_skipFile;
 
     // 成果输出文件夹
     QString m_outputDir;

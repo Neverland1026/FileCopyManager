@@ -271,14 +271,14 @@ void MainView::startProcess(CommandType type)
 
 void MainView::topWarning(const QString& info)
 {
-    QMessageBox messageBox(QMessageBox::Question, QObject::tr("提示"), info, QMessageBox::Yes);
+    QMessageBox messageBox(QMessageBox::Question, QObject::tr("提示"), info, QMessageBox::Yes, this);
     messageBox.button(QMessageBox::Yes)->setText(QObject::tr("确定"));
     messageBox.exec();
 }
 
 bool MainView::topQuestion(const QString& info)
 {
-    QMessageBox messageBox(QMessageBox::Question, QObject::tr("提示"), info, QMessageBox::Yes | QMessageBox::No);
+    QMessageBox messageBox(QMessageBox::Question, QObject::tr("提示"), info, QMessageBox::Yes | QMessageBox::No, this);
     messageBox.button(QMessageBox::Yes)->setText(QObject::tr("确定"));
     messageBox.button(QMessageBox::No)->setText(QObject::tr("取消"));
 
@@ -313,13 +313,26 @@ void MainView::dropEvent(QDropEvent* event)
         QFileInfo fi(fileName);
         if(fi.exists())
         {
-            QLineEdit* child = static_cast<QLineEdit*>(childAt(event->pos()));
+            QLineEdit* child = static_cast<QLineEdit*>(childAt(event->position().toPoint()));
             if(Q_NULLPTR == child || !child->inherits("QLineEdit"))
             {
                 return;
             }
 
-            child->setText(fileName);
+            if(child == ui->lineEdit_srcDirectory || child == ui->lineEdit_dstDirectory)
+            {
+                if(fi.isDir())
+                {
+                    child->setText(fileName);
+                }
+            }
+            else if(child == ui->lineEdit_targetFile)
+            {
+                if(fi.isFile() && fi.suffix() == "txt")
+                {
+                    child->setText(fileName);
+                }
+            }
         }
     }
 }

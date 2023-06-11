@@ -14,6 +14,7 @@ CopyThread::CopyThread(QObject *parent /*= nullptr*/)
     : QThread(parent)
     , m_processHistory({})
     , m_processCount({})
+    , m_skipFile({})
     , m_outputDir("")
 {
 
@@ -60,6 +61,12 @@ void CopyThread::run()
         uchar* fPtr = file.map(0, file.size());
         if(fPtr)
         {
+            // 拷贝、剪切才清空
+            if(CommandType::CT_CopySrc2Dst == m_commandType || CommandType::CT_MoveSrc2Dst == m_commandType)
+            {
+                m_skipFile.clear();
+            }
+
             // 转成 QString
             std::string str = (char*)fPtr;
             QString fileContent = QString::fromStdString(str);
@@ -123,13 +130,18 @@ void CopyThread::run()
                         {
                             m_processHistory.push_back(std::make_pair(targetFile, OperateResultType::ORT_DstAlreadyExist));
                             ++m_processCount[OperateResultType::ORT_DstAlreadyExist];
+
+                            // 已经存在的文件，需要跳过
+                            m_skipFile.insert(dstFile);
+
                             break;
                         }
                     }
                     else if(CommandType::CT_DeleteDst == m_commandType)
                     {
                         // 不存在失败
-                        if(false == QFileInfo::exists(dstFile))
+                        if((false == QFileInfo::exists(dstFile))
+                            || (m_skipFile.contains(dstFile)))
                         {
                             m_processHistory.push_back(std::make_pair(targetFile, OperateResultType::/*ORT_Exception*/ORT_Succeed));
                             ++m_processCount[OperateResultType::/*ORT_Exception*/ORT_Succeed];
@@ -138,18 +150,13 @@ void CopyThread::run()
                     }
                     else if(CommandType::CT_MoveDst2Src == m_commandType)
                     {
-                        // 不存在失败
-                        if(false == QFileInfo::exists(dstFile))
+                        // 不存在、或者上一次跳过的文件，不参与撤销，并且应当视为成功
+                        if((false == QFileInfo::exists(dstFile))
+                            || (true == QFileInfo::exists(srcFile))
+                            || (m_skipFile.contains(dstFile)))
                         {
                             m_processHistory.push_back(std::make_pair(targetFile, OperateResultType::/*ORT_SrcNotExist*/ORT_Succeed));
                             ++m_processCount[OperateResultType::/*ORT_SrcNotExist*/ORT_Succeed];
-                            break;
-                        }
-
-                        if(true == QFileInfo::exists(srcFile))
-                        {
-                            m_processHistory.push_back(std::make_pair(targetFile, OperateResultType::/*ORT_DstAlreadyExist*/ORT_Succeed));
-                            ++m_processCount[OperateResultType::/*ORT_DstAlreadyExist*/ORT_Succeed];
                             break;
                         }
                     }
