@@ -122,10 +122,7 @@ void MainView::init()
     QObject::connect(m_copyThread, &CopyThread::sigCopyException, this, [&]() {
         ui->progressBar->reset();
         setMainViewEnabled(true);
-        QMessageBox::information(this,
-                                 QObject::tr("提示"),
-                                 QObject::tr("拷贝异常！"));
-
+        topWarning(QObject::tr("操作异常！"));
     });
     QObject::connect(m_copyThread, &CopyThread::sigUpdateRange, this, [&](int valueMinimum, int valueMaximum) {
         ui->progressBar->setFormat(QString("%1 / %2").arg(valueMinimum).arg(valueMaximum));
@@ -146,11 +143,15 @@ void MainView::init()
         m_outDirectory = outputDir;
 
         ui->progressBar->setValue(ui->progressBar->maximum());
+
+        // 汇总失败项
+        int faild = srcNotExist + dstAlreadyExist + exception;
+
         ui->progressBar->setFormat(QObject::tr("%1 / %2 (成功：%3  失败：%4)")
                                        .arg(ui->progressBar->maximum())
                                        .arg(ui->progressBar->maximum())
                                        .arg(succeed)
-                                       .arg(srcNotExist + dstAlreadyExist + exception));
+                                       .arg(faild));
 
         setMainViewEnabled(true);
 
@@ -163,13 +164,36 @@ void MainView::init()
 
         if(ui->checkBox_openResultDir->isChecked())
         {
-            ui->pushButton_outDirectory->clicked();
+            emit ui->pushButton_outDirectory->clicked();
         }
 
-        QMessageBox::information(this,
-                                 QObject::tr("提示"),
-                                 QObject::tr("全部完成！"));
+        if(0 == faild || CommandType::CT_Undo == m_lastCommandType/* 撤销不存在失败 */)
+        {
+            QMessageBox::information(this,
+                                     QObject::tr("提示"),
+                                     QObject::tr("一共 %1 项，全部操作成功！").arg(succeed));
+        }
+        else
+        {
+            QString info = QObject::tr("一共 %1 项，全部操作完成，其中：\n"
+                                       "成功：%2\n"
+                                       "源文件不存在：%3\n"
+                                       "目标文件存在或拷贝异常：%4\n\n"
+                                       "是否打开统计表单？")
+                               .arg(succeed + faild)
+                               .arg(succeed)
+                               .arg(srcNotExist)
+                               .arg(dstAlreadyExist + exception);
 
+            if(topQuestion(info))
+            {
+
+            }
+            else
+            {
+                return;
+            }
+        }
     });
 }
 
@@ -200,18 +224,14 @@ void MainView::startProcess(CommandType type)
 #ifdef USE_SRC_DIR
     if(ui->lineEdit_srcDirectory->text() == ui->lineEdit_dstDirectory->text())
     {
-        QMessageBox::information(this,
-                                 QObject::tr("提示"),
-                                 QObject::tr("原始路径不能和目标路径一致！"));
+        topWarning(QObject::tr("原始路径不能和目标路径一致！"));
         return;
     }
 #endif
 
     if(false == QFileInfo::exists(ui->lineEdit_targetFile->text()))
     {
-        QMessageBox::information(this,
-                                 QObject::tr("提示"),
-                                 QObject::tr("文件表单不一致！"));
+        topWarning(QObject::tr("文件表单不存在！"));
         return;
     }
 
@@ -238,6 +258,21 @@ void MainView::startProcess(CommandType type)
     m_lastCommandType = type;
 
     m_copyThread->start();
+}
+
+void MainView::topWarning(const QString& info)
+{
+    QMessageBox messageBox(QMessageBox::Question, QObject::tr("提示"), info, QMessageBox::Yes);
+    messageBox.button(QMessageBox::Yes)->setText(QObject::tr("确定"));
+}
+
+bool MainView::topQuestion(const QString& info)
+{
+    QMessageBox messageBox(QMessageBox::Question, QObject::tr("提示"), info, QMessageBox::Yes | QMessageBox::No);
+    messageBox.button(QMessageBox::Yes)->setText(QObject::tr("确定"));
+    messageBox.button(QMessageBox::No)->setText(QObject::tr("取消"));
+
+    return (messageBox.exec() == QMessageBox::Yes);
 }
 
 void MainView::dragEnterEvent(QDragEnterEvent* event)
@@ -292,12 +327,7 @@ void MainView::keyPressEvent(QKeyEvent* event)
 
 void MainView::closeEvent(QCloseEvent* event)
 {
-    QMessageBox::StandardButton button = QMessageBox::information(this,
-                                                                  QObject::tr("提示"),
-                                                                  QObject::tr("确定要退出吗？"),
-                                                                  QMessageBox::StandardButton::Ok,
-                                                                  QMessageBox::StandardButton::Cancel);
-    if(button == QMessageBox::StandardButton::Ok)
+    if(topQuestion(QObject::tr("确定要关闭软件吗？")))
     {
         m_copyThread->quit();
         m_copyThread->wait();

@@ -128,27 +128,28 @@ void CopyThread::run()
                     }
                     else if(CommandType::CT_DeleteDst == m_commandType)
                     {
+                        // 不存在失败
                         if(false == QFileInfo::exists(dstFile))
                         {
-                            // 这个要不要视为异常有待商榷
-                            m_processHistory.push_back(std::make_pair(targetFile, OperateResultType::ORT_Exception));
-                            ++m_processCount[OperateResultType::ORT_Exception];
+                            m_processHistory.push_back(std::make_pair(targetFile, OperateResultType::/*ORT_Exception*/ORT_Succeed));
+                            ++m_processCount[OperateResultType::/*ORT_Exception*/ORT_Succeed];
                             break;
                         }
                     }
                     else if(CommandType::CT_MoveDst2Src == m_commandType)
                     {
+                        // 不存在失败
                         if(false == QFileInfo::exists(dstFile))
                         {
-                            m_processHistory.push_back(std::make_pair(targetFile, OperateResultType::ORT_SrcNotExist));
-                            ++m_processCount[OperateResultType::ORT_SrcNotExist];
+                            m_processHistory.push_back(std::make_pair(targetFile, OperateResultType::/*ORT_SrcNotExist*/ORT_Succeed));
+                            ++m_processCount[OperateResultType::/*ORT_SrcNotExist*/ORT_Succeed];
                             break;
                         }
 
                         if(true == QFileInfo::exists(srcFile))
                         {
-                            m_processHistory.push_back(std::make_pair(targetFile, OperateResultType::ORT_DstAlreadyExist));
-                            ++m_processCount[OperateResultType::ORT_DstAlreadyExist];
+                            m_processHistory.push_back(std::make_pair(targetFile, OperateResultType::/*ORT_DstAlreadyExist*/ORT_Succeed));
+                            ++m_processCount[OperateResultType::/*ORT_DstAlreadyExist*/ORT_Succeed];
                             break;
                         }
                     }
@@ -190,7 +191,7 @@ void CopyThread::run()
                 // 刷新进度
                 emit sigProgress(i + 1, fileList.size());
 
-//                QThread::msleep(100);
+                //                QThread::msleep(100);
             }
 
             // 关闭文件
