@@ -27,17 +27,24 @@ signals:
     // 开始
     void sigStart();
 
-    // 结束
-    void sigStop(const QString& outputDir);
+    // 拷贝异常
+    void sigCopyException();
+
+    // 更新进度区间
+    void sigUpdateRange(int valueMinimum, int valueMaximum);
 
     // 实时进度
-    void sigProgress(int value);
+    void sigProgress(int index, int total);
 
     // 开始写出到本地
     void sigGenerateCSV();
 
-    // 拷贝异常
-    void sigCopyException();
+    // 结束
+    void sigStop(const QString& outputDir,
+                 const int succeed,
+                 const int srcNotExist,
+                 const int dstAlreadyExist,
+                 const int exception);
 
 protected:
 
@@ -45,7 +52,7 @@ protected:
     void run() override;
 
     // 写文件
-    void write(const std::string& fileSuffix = ".csv");
+    void write(const std::string& fileSuffix = ".txt");
 
 private:
 
@@ -62,7 +69,7 @@ private:
 
     // 记录每项的拷贝状态
     QVector<QPair<QString, ProcessType>> m_processHistory;
-    std::set<ProcessType> m_processTypeSet;
+    std::map<ProcessType, int> m_processCount;
 
     // 成果输出文件夹
     QString m_outputDir;

@@ -38,7 +38,7 @@ void MainView::init()
     this->setAcceptDrops(true);
 
     QTimer::singleShot(0, this, [&]() {
-        //::SetWindowPos((HWND)(this->winId()), HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+        ::SetWindowPos((HWND)(this->winId()), HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
     });
 
 // 源路径
@@ -57,9 +57,15 @@ void MainView::init()
 
     // 目标路径
     QObject::connect(ui->pushButton_dstDirectory, &QPushButton::clicked, this, [&]() {
+        static QString s_directory = "";
+        s_directory = s_directory.isEmpty() ? QDir::tempPath() : s_directory;
         ui->lineEdit_dstDirectory->setText(QFileDialog::getExistingDirectory(this,
                                                                              QObject::tr("选择目标文件夹"),
-                                                                             QDir::tempPath()));
+                                                                             s_directory));
+        if(false == ui->lineEdit_dstDirectory->text().isEmpty())
+        {
+            s_directory = ui->lineEdit_dstDirectory->text();
+        }
     });
     QObject::connect(ui->lineEdit_dstDirectory, &QLineEdit::textChanged, this, [&](const QString&) {
         toggleCopyAndCutEnabled();
@@ -67,10 +73,16 @@ void MainView::init()
 
     // 搜索 txt
     QObject::connect(ui->pushButton_targetFile, &QPushButton::clicked, this, [&]() {
+        static QString s_directory = "";
+        s_directory = s_directory.isEmpty() ? QDir::tempPath() : s_directory;
         ui->lineEdit_targetFile->setText(QFileDialog::getOpenFileName(this,
                                                                       QObject::tr("选择TXT文件"),
-                                                                      QDir::tempPath(),
+                                                                      s_directory,
                                                                       "Txt File(*.TXT *.txt)"));
+        if(false == ui->lineEdit_targetFile->text().isEmpty())
+        {
+            s_directory = QFileInfo(ui->lineEdit_targetFile->text()).filePath();
+        }
     });
     QObject::connect(ui->lineEdit_targetFile, &QLineEdit::textChanged, this, [&](const QString&) {
         toggleCopyAndCutEnabled();
@@ -86,14 +98,47 @@ void MainView::init()
         startProcess(1);
     });
 
-    // 进度条
-    QObject::connect(m_copyThread, &CopyThread::sigStart, this, [&]() {
-        ui->progressBar->setValue(0);
+    // 撤销
+    QObject::connect(ui->pushButton_undo, &QPushButton::clicked, this, [&]() {
+        startProcess(1);
     });
-    QObject::connect(m_copyThread, &CopyThread::sigStop, this, [&](const QString& outputDir) {
-        ui->progressBar->setMinimum(0);
-        ui->progressBar->setMaximum(100);
-        ui->progressBar->setValue(100);
+
+    // 进度条
+    ui->progressBar->setAlignment(Qt::AlignCenter);
+    ui->progressBar->setFormat(QString("%1 / %2").arg(0).arg(0));
+    QObject::connect(m_copyThread, &CopyThread::sigStart, this, [&]() {
+        ui->progressBar->reset();
+    });
+    QObject::connect(m_copyThread, &CopyThread::sigCopyException, this, [&]() {
+        ui->progressBar->reset();
+        setMainViewEnabled(true);
+        QMessageBox::information(this,
+                                 QObject::tr("提示"),
+                                 QObject::tr("拷贝异常！"));
+
+    });
+    QObject::connect(m_copyThread, &CopyThread::sigUpdateRange, this, [&](int valueMinimum, int valueMaximum) {
+        ui->progressBar->setFormat(QString("%1 / %2").arg(valueMinimum).arg(valueMaximum));
+        ui->progressBar->setRange(valueMinimum, valueMaximum);
+    });
+    QObject::connect(m_copyThread, &CopyThread::sigProgress, this, [&](int index, int total) {
+        ui->progressBar->setFormat(QString("%1 / %2").arg(index).arg(total));
+        ui->progressBar->setValue(index);
+    });
+    QObject::connect(m_copyThread, &CopyThread::sigGenerateCSV, this, [&]() {
+        ui->progressBar->setValue(-2);
+    });
+    QObject::connect(m_copyThread, &CopyThread::sigStop, this, [&](const QString& outputDir,
+                                                                   const int succeed,
+                                                                   const int srcNotExist,
+                                                                   const int dstAlreadyExist,
+                                                                   const int exception) {
+        ui->progressBar->setValue(ui->progressBar->maximum());
+        ui->progressBar->setFormat(QObject::tr("%1 / %2 (成功：%3  失败：%4)")
+                                       .arg(ui->progressBar->maximum())
+                                       .arg(ui->progressBar->maximum())
+                                       .arg(succeed)
+                                       .arg(srcNotExist + dstAlreadyExist + exception));
 
         setMainViewEnabled(true);
 
@@ -105,25 +150,12 @@ void MainView::init()
             }
         }
 
+        ui->pushButton_undo->setEnabled(succeed > 0);
+
         QMessageBox::information(this,
                                  QObject::tr("提示"),
                                  QObject::tr("全部完成！"));
 
-    });
-    QObject::connect(m_copyThread, &CopyThread::sigProgress, this, [&](int value) {
-        ui->progressBar->setValue(value);
-    });
-    QObject::connect(m_copyThread, &CopyThread::sigGenerateCSV, this, [&]() {
-        ui->progressBar->setMinimum(100);
-        ui->progressBar->setMaximum(0);
-    });
-    QObject::connect(m_copyThread, &CopyThread::sigCopyException, this, [&]() {
-        ui->progressBar->setValue(100);
-        QMessageBox::information(this,
-                                 QObject::tr("提示"),
-                                 QObject::tr("拷贝异常！"));
-
-        setMainViewEnabled(true);
     });
 }
 
@@ -147,6 +179,7 @@ void MainView::setMainViewEnabled(bool enabled)
     ui->pushButton_targetFile->setEnabled(enabled);
     ui->pushButton_copy->setEnabled(enabled);
     ui->pushButton_cut->setEnabled(enabled);
+    ui->pushButton_undo->setEnabled(enabled);
 }
 
 void MainView::startProcess(int type)

@@ -13,7 +13,7 @@
 CopyThread::CopyThread(QObject *parent /*= nullptr*/)
     : QThread(parent)
     , m_processHistory({})
-    , m_processTypeSet({})
+    , m_processCount({})
     , m_outputDir("")
 {
 
@@ -40,7 +40,11 @@ void CopyThread::run()
     emit sigStart();
 
     m_processHistory.resize(0);
-    m_processTypeSet.clear();
+    m_processCount.clear();
+    m_processCount[ProcessType::PT_Succeed] = 0;
+    m_processCount[ProcessType::PT_SrcNotExist] = 0;
+    m_processCount[ProcessType::PT_DstAlreadyExist] = 0;
+    m_processCount[ProcessType::PT_Exception] = 0;
     m_outputDir.clear();
 
     // 解析要拷贝的文件名
@@ -81,6 +85,8 @@ void CopyThread::run()
                 return;
             }
 
+            emit sigUpdateRange(0, fileList.size());
+
 // 拿到引用
 #ifdef USE_SRC_DIR
             const QString& srcDir = std::get<0>(m_copyInfo);
@@ -101,7 +107,7 @@ void CopyThread::run()
                     if(false == QFileInfo::exists(srcFile))
                     {
                         m_processHistory.push_back(std::make_pair(fileList[i], ProcessType::PT_SrcNotExist));
-                        m_processTypeSet.insert(ProcessType::PT_SrcNotExist);
+                        ++m_processCount[ProcessType::PT_SrcNotExist];
                         break;
                     }
 
@@ -110,7 +116,7 @@ void CopyThread::run()
                     if(true == QFileInfo::exists(dstFile))
                     {
                         m_processHistory.push_back(std::make_pair(fileList[i], ProcessType::PT_DstAlreadyExist));
-                        m_processTypeSet.insert(ProcessType::PT_DstAlreadyExist);
+                        ++m_processCount[ProcessType::PT_DstAlreadyExist];
                         break;
                     }
 
@@ -119,18 +125,20 @@ void CopyThread::run()
                     if(ret)
                     {
                         m_processHistory.push_back(std::make_pair(fileList[i], ProcessType::PT_Succeed));
-                        m_processTypeSet.insert(ProcessType::PT_Succeed);
+                        ++m_processCount[ProcessType::PT_Succeed];
                     }
                     else
                     {
                         m_processHistory.push_back(std::make_pair(fileList[i], ProcessType::PT_Exception));
-                        m_processTypeSet.insert(ProcessType::PT_Exception);
+                        ++m_processCount[ProcessType::PT_Exception];
                     }
 
                 } while (0);
 
                 // 刷新进度
-                emit sigProgress((float)(i + 1) / fileList.size() * 100);
+                emit sigProgress(i + 1, fileList.size());
+
+                QThread::sleep(1);
             }
 
             // 关闭文件
@@ -148,7 +156,11 @@ void CopyThread::run()
         return;
     }
 
-    emit sigStop(m_outputDir);
+    emit sigStop(m_outputDir,
+                 m_processCount[ProcessType::PT_Succeed],
+                 m_processCount[ProcessType::PT_SrcNotExist],
+                 m_processCount[ProcessType::PT_DstAlreadyExist],
+                 m_processCount[ProcessType::PT_Exception]);
 }
 
 void CopyThread::write(const std::string& fileSuffix /*= ".csv"*/)
@@ -178,19 +190,19 @@ void CopyThread::write(const std::string& fileSuffix /*= ".csv"*/)
     };
 
     // 开始写文件
-    if(m_processTypeSet.count(ProcessType::PT_Succeed) > 0)
+    if(m_processCount[ProcessType::PT_Succeed] > 0)
     {
         out("Succeed", ProcessType::PT_Succeed);
     }
-    if(m_processTypeSet.count(ProcessType::PT_SrcNotExist) > 0)
+    if(m_processCount[ProcessType::PT_SrcNotExist] > 0)
     {
         out("SrcNotExist", ProcessType::PT_SrcNotExist);
     }
-    if(m_processTypeSet.count(ProcessType::PT_DstAlreadyExist) > 0)
+    if(m_processCount[ProcessType::PT_DstAlreadyExist] > 0)
     {
         out("DstAlreadyExist", ProcessType::PT_DstAlreadyExist);
     }
-    if(m_processTypeSet.count(ProcessType::PT_Exception) > 0)
+    if(m_processCount[ProcessType::PT_Exception] > 0)
     {
         out("Exception", ProcessType::PT_Exception);
     }
