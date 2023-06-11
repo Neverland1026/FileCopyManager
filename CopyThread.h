@@ -56,20 +56,31 @@ protected:
 
 private:
 
-    // 源文件夹、目标文件夹、文件集合
-    std::tuple<QString, QString, QString, int> m_copyInfo;
+    // 操作类型
+    enum class CommandType {
+        CT_CopySrc2Dst,
+        CT_MoveSrc2Dst,
+        CT_DeleteDst,
+        CT_MoveDst2Src,
+    };
 
-    // 拷贝结果枚举
-    enum class ProcessType {
-        PT_Succeed,
-        PT_SrcNotExist,
-        PT_DstAlreadyExist,
-        PT_Exception,
+    // 源文件夹、目标文件夹、文件表单、操作类型
+    QString m_srcDir;
+    QString m_dstDir;
+    QString m_copyInfo;
+    CommandType m_commandType;
+
+    // 操作结果枚举
+    enum class OperateResultType {
+        ORT_Succeed,
+        ORT_SrcNotExist,
+        ORT_DstAlreadyExist,
+        ORT_Exception,
     };
 
     // 记录每项的拷贝状态
-    QVector<QPair<QString, ProcessType>> m_processHistory;
-    std::map<ProcessType, int> m_processCount;
+    QVector<QPair<QString, OperateResultType>> m_processHistory;
+    std::map<OperateResultType, int> m_processCount;
 
     // 成果输出文件夹
     QString m_outputDir;

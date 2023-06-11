@@ -16,6 +16,7 @@
 MainView::MainView(QWidget *parent)
     : QDialog(parent)
     , ui(new Ui::MainView)
+    , m_lastCommandType(CommandType::CT_Copy)
     , m_copyThread(new CopyThread(this))
 {
     ui->setupUi(this);
@@ -38,7 +39,7 @@ void MainView::init()
     this->setAcceptDrops(true);
 
     QTimer::singleShot(0, this, [&]() {
-        ::SetWindowPos((HWND)(this->winId()), HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+        //::SetWindowPos((HWND)(this->winId()), HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
     });
 
 // 源路径
@@ -90,17 +91,26 @@ void MainView::init()
 
     // 复制
     QObject::connect(ui->pushButton_copy, &QPushButton::clicked, this, [&]() {
-        startProcess(0);
+        startProcess(CommandType::CT_Copy);
     });
 
     // 移动
     QObject::connect(ui->pushButton_cut, &QPushButton::clicked, this, [&]() {
-        startProcess(1);
+        startProcess(CommandType::CT_Move);
     });
 
     // 撤销
     QObject::connect(ui->pushButton_undo, &QPushButton::clicked, this, [&]() {
-        startProcess(1);
+        ui->pushButton_undo->setEnabled(false);
+        startProcess(CommandType::CT_Undo);
+    });
+
+    // 打开输出文件夹
+    QObject::connect(ui->pushButton_outDirectory, &QPushButton::clicked, this, [&]() {
+        if(QFileInfo::exists(m_outDirectory) && QFileInfo(m_outDirectory).isDir())
+        {
+            QDesktopServices::openUrl(QUrl("file:///" + m_outDirectory));
+        }
     });
 
     // 进度条
@@ -133,6 +143,8 @@ void MainView::init()
                                                                    const int srcNotExist,
                                                                    const int dstAlreadyExist,
                                                                    const int exception) {
+        m_outDirectory = outputDir;
+
         ui->progressBar->setValue(ui->progressBar->maximum());
         ui->progressBar->setFormat(QObject::tr("%1 / %2 (成功：%3  失败：%4)")
                                        .arg(ui->progressBar->maximum())
@@ -142,15 +154,17 @@ void MainView::init()
 
         setMainViewEnabled(true);
 
-        if(ui->checkBox_openResultDir->isChecked())
+        ui->pushButton_outDirectory->setEnabled(true);
+
+        if(CommandType::CT_Undo != m_lastCommandType)
         {
-            if(QFileInfo::exists(outputDir))
-            {
-                QDesktopServices::openUrl(QUrl("file:///" + outputDir));
-            }
+            ui->pushButton_undo->setEnabled(succeed > 0);
         }
 
-        ui->pushButton_undo->setEnabled(succeed > 0);
+        if(ui->checkBox_openResultDir->isChecked())
+        {
+            ui->pushButton_outDirectory->clicked();
+        }
 
         QMessageBox::information(this,
                                  QObject::tr("提示"),
@@ -179,10 +193,9 @@ void MainView::setMainViewEnabled(bool enabled)
     ui->pushButton_targetFile->setEnabled(enabled);
     ui->pushButton_copy->setEnabled(enabled);
     ui->pushButton_cut->setEnabled(enabled);
-    ui->pushButton_undo->setEnabled(enabled);
 }
 
-void MainView::startProcess(int type)
+void MainView::startProcess(CommandType type)
 {
 #ifdef USE_SRC_DIR
     if(ui->lineEdit_srcDirectory->text() == ui->lineEdit_dstDirectory->text())
@@ -194,7 +207,7 @@ void MainView::startProcess(int type)
     }
 #endif
 
-    if(ui->lineEdit_targetFile->text().isEmpty())
+    if(false == QFileInfo::exists(ui->lineEdit_targetFile->text()))
     {
         QMessageBox::information(this,
                                  QObject::tr("提示"),
@@ -205,10 +218,24 @@ void MainView::startProcess(int type)
     // 开始准备拷贝
     setMainViewEnabled(false);
     ui->textBrowser_copyFailed->clear();
-    m_copyThread->setCopyInfo(ui->lineEdit_srcDirectory->text(),
-                              ui->lineEdit_dstDirectory->text(),
-                              ui->lineEdit_targetFile->text(),
-                              type);
+
+    // 分情况讨论
+    if(CommandType::CT_Copy == type || CommandType::CT_Move == type)
+    {
+        m_copyThread->setCopyInfo(ui->lineEdit_srcDirectory->text(),
+                                  ui->lineEdit_dstDirectory->text(),
+                                  ui->lineEdit_targetFile->text(),
+                                  (CommandType::CT_Copy == type ? 0 : 1));
+    }
+    else if(CommandType::CT_Undo == type)
+    {
+        m_copyThread->setCopyInfo(ui->lineEdit_srcDirectory->text(),
+                                  ui->lineEdit_dstDirectory->text(),
+                                  ui->lineEdit_targetFile->text(),
+                                  (CommandType::CT_Copy == m_lastCommandType ? 2 : 3));
+    }
+
+    m_lastCommandType = type;
 
     m_copyThread->start();
 }
@@ -249,6 +276,17 @@ void MainView::dropEvent(QDropEvent* event)
 
             child->setText(fileName);
         }
+    }
+}
+
+void MainView::keyPressEvent(QKeyEvent* event)
+{
+    switch(event->key())
+    {
+    case Qt::Key_Escape:
+        break;
+    default:
+        QWidget::keyPressEvent(event);
     }
 }
 
