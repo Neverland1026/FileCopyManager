@@ -167,27 +167,37 @@ void MainView::init()
             emit ui->pushButton_outDirectory->clicked();
         }
 
+        QString info = QObject::tr("一共 %1 项，全部操作完成，其中：\n"
+                                   "成功：%2\n"
+                                   "源文件不存在：%3\n"
+                                   "目标文件存在或拷贝异常：%4")
+                           .arg(succeed + faild)
+                           .arg(succeed)
+                           .arg(srcNotExist)
+                           .arg(dstAlreadyExist + exception);
         if(0 == faild || CommandType::CT_Undo == m_lastCommandType/* 撤销不存在失败 */)
         {
-            QMessageBox::information(this,
-                                     QObject::tr("提示"),
-                                     QObject::tr("一共 %1 项，全部操作成功！").arg(succeed));
+            topWarning(info);
         }
         else
         {
-            QString info = QObject::tr("一共 %1 项，全部操作完成，其中：\n"
-                                       "成功：%2\n"
-                                       "源文件不存在：%3\n"
-                                       "目标文件存在或拷贝异常：%4\n\n"
-                                       "是否打开统计表单？")
-                               .arg(succeed + faild)
-                               .arg(succeed)
-                               .arg(srcNotExist)
-                               .arg(dstAlreadyExist + exception);
-
+            info += "\n\n是否打开统计表单？";
             if(topQuestion(info))
             {
-
+                QDir dir(m_outDirectory);
+                if(dir.exists())
+                {
+                    dir.setFilter(QDir::Files | QDir::NoSymLinks);
+                    QStringList filters;
+                    filters << QString("*.txt");
+                    dir.setNameFilters(filters);
+                    const int count = dir.count();
+                    for(int i = 0; i < count; ++i)
+                    {
+                        QString filePath = m_outDirectory + "/" + dir[i];
+                        QDesktopServices::openUrl(QUrl("file:///" + filePath));
+                    }
+                }
             }
             else
             {
@@ -237,7 +247,6 @@ void MainView::startProcess(CommandType type)
 
     // 开始准备拷贝
     setMainViewEnabled(false);
-    ui->textBrowser_copyFailed->clear();
 
     // 分情况讨论
     if(CommandType::CT_Copy == type || CommandType::CT_Move == type)
@@ -264,6 +273,7 @@ void MainView::topWarning(const QString& info)
 {
     QMessageBox messageBox(QMessageBox::Question, QObject::tr("提示"), info, QMessageBox::Yes);
     messageBox.button(QMessageBox::Yes)->setText(QObject::tr("确定"));
+    messageBox.exec();
 }
 
 bool MainView::topQuestion(const QString& info)
