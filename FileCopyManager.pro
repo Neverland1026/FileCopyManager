@@ -24,6 +24,9 @@ RC_ICONS = logo.ico
 
 LIBS += -lUser32
 
+QMAKE_CXXFLAGS += -openmp
+QMAKE_LFLAGS += -openmp
+
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
 else: unix:!android: target.path = /opt/$${TARGET}/bin

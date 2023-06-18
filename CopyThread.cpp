@@ -7,6 +7,8 @@
 #include <QCoreApplication>
 #include <fstream>
 
+#include "omp.h"
+
 // 是否使用源路径
 //#define USE_SRC_DIR
 
@@ -189,20 +191,30 @@ void CopyThread::run()
                     }
                     else
                     {
-                        m_processHistory.push_back(std::make_pair(targetFile, OperateResultType::ORT_Exception));
-                        ++m_processCount[OperateResultType::ORT_Exception];
+                        if(CommandType::CT_CopySrc2Dst == m_commandType || CommandType::CT_MoveSrc2Dst == m_commandType)
+                        {
+                            m_processHistory.push_back(std::make_pair(targetFile, OperateResultType::ORT_Exception));
+                            ++m_processCount[OperateResultType::ORT_Exception];
+                        }
+                        else
+                        {
+                            // 撤销不存在失败
+                            m_processHistory.push_back(std::make_pair(targetFile, OperateResultType::/*ORT_SrcNotExist*/ORT_Succeed));
+                            ++m_processCount[OperateResultType::/*ORT_SrcNotExist*/ORT_Succeed];
+                        }
                     }
 
                 } while (0);
 
                 // 刷新进度
                 emit sigProgress(i + 1, fileList.size());
-
-                //                QThread::msleep(100);
             }
 
             // 关闭文件
             file.close();
+
+            // 关闭缓冲
+            file.unmap(fPtr);
 
             // 将文件输出到本地
             emit sigGenerateCSV();
@@ -228,11 +240,16 @@ void CopyThread::write(const std::string& fileSuffix /*= ".csv"*/)
     // 获取当前时间，构成后缀
     QDate date = QDate::currentDate();
     QTime time = QTime::currentTime();
-    QString suffix = "_" + date.toString("yyyy_MM_dd") + "_" + time.toString("hh_mm_ss");
+    QString suffix = date.toString("yyyy_MM_dd") + "_" + time.toString("hh_mm_ss");
 
-    // 创建文件夹
-    m_outputDir = QCoreApplication::applicationDirPath() + "/result" + suffix;
+    // 创建根文件夹
+    m_outputDir = QCoreApplication::applicationDirPath() + "/result";
     QDir dir;
+    dir.mkpath(m_outputDir);
+
+    // 创建子文件夹
+    m_outputDir = m_outputDir + "/" + suffix;
+    dir = QDir(m_outputDir);
     dir.mkpath(m_outputDir);
 
     // 定义打印
@@ -240,7 +257,7 @@ void CopyThread::write(const std::string& fileSuffix /*= ".csv"*/)
     {
         if(m_processCount[type] > 0)
         {
-            std::ofstream ofs(m_outputDir.toStdString() + "/" + fileName + fileSuffix);
+            std::ofstream ofs("./result/" + suffix.toStdString() + "/" + fileName + fileSuffix);
             for(const auto& h : m_processHistory)
             {
                 if(type == h.second)

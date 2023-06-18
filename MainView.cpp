@@ -24,6 +24,9 @@ MainView::MainView(QWidget *parent)
     this->setFixedSize(600, this->minimumHeight());
 
     init();
+
+//    ui->lineEdit_dstDirectory->setText("E:/123");
+//    ui->lineEdit_targetFile->setText("C:/Users/Neverland_LY/Desktop/123.txt");
 }
 
 MainView::~MainView()
@@ -101,7 +104,6 @@ void MainView::init()
 
     // 撤销
     QObject::connect(ui->pushButton_undo, &QPushButton::clicked, this, [&]() {
-        ui->pushButton_undo->setEnabled(false);
         startProcess(CommandType::CT_Undo);
     });
 
@@ -247,6 +249,9 @@ void MainView::startProcess(CommandType type)
 
     // 开始准备拷贝
     setMainViewEnabled(false);
+
+    // 也设置为 false
+    ui->pushButton_undo->setEnabled(false);
 
     // 分情况讨论
     if(CommandType::CT_Copy == type || CommandType::CT_Move == type)
